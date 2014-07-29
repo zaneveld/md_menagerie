@@ -15,7 +15,8 @@ __status__ = "Development"
 
 from cogent.util.unit_test import TestCase, main
 from md_menagerie.mapping import MappingTable
-from md_menagerie.parallel_sets import get_top_level_sets_from_mapping
+from md_menagerie.parallel_sets import get_top_level_sets_from_mapping,\
+  intersect_two_set_dicts
 
 
 class ParallelSetsTests(TestCase):
@@ -76,6 +77,20 @@ class ParallelSetsTests(TestCase):
         
         mapping_table = self.ParallelSetsTable
         obs = get_top_level_sets_from_mapping(mapping_table,categories)
+        self.assertEqualItems(obs,exp)
+
+    def test_intersect_two_set_dicts_OK_with_valid_input(self):
+        """intersect_two_set_dicts calculates intersection of set dicts"""
+        d1_temp = {"high":set(['s1','s2']),"low":set(['s3','s4'])}
+        d2_algae = {"algae":set(['s1','s2','s4']),"no_algae":set(['s3'])}
+
+        exp =\
+          {("high","algae"):set(['s1','s2']),
+           ("low","algae"):set (['s4']),
+           ("high","no_algae"):set([]),
+           ("low","no_algae"):set(['s3'])}
+
+        obs = intersect_two_set_dicts(d1_temp,d2_algae)
         self.assertEqualItems(obs,exp)
 
 
