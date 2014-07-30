@@ -33,7 +33,70 @@ def parallel_sets_from_mapping(mapping_table,categories):
     categories -- a list of categories
     """
     #First calculate sets for top level categoreies
-    pass
+    top_level_sets = get_top_level_sets_from_mapping(mapping_table,categories)
+
+    #Now calculate parallel_sets from this dictionary
+    parallel_sets_from_set_dict(set_dict,categories)
+
+def parallel_sets_from_dict_of_set_dicts(dict_of_set_dicts,categories):
+    """Calculate a list of parallel sets from a dict of dicts of sets of sampleids
+
+    dict_of_set_dicts --  a dict of dicts.  Outer level dict keys are mapping table 
+      categories.  Inner level dicts are keyed by the values for each category.
+      Values of the inner dicts are sets of sampleids.
+      Exampe:  if there is one category called 'Temp' with two values 'high' and 'low',
+      dict_of_set_dicts could be {'Temp':{'high':set(['s1','s2']),'low':set(['s3','s4'])}}
+
+    categories -- a list of categories.  (['Temp'] in the above example)
+    
+    Typical input has multiple categories in set_dict.  The function
+    calculates sets of ids that are shared by adjacent categories in the list
+    of categories (this may seem arbitrary, but adjacent categories must
+    be joined in the plot, so we need the width of adjacent, but not non-adjacent
+    sets)
+
+    The returned 'levels' of parallel sets will be in the form of a list
+    of dicts of sets.
+    """
+    levels = []  #Corresponding to the levels of the plot
+
+    for curr_level,category in enumerate(categories):
+        if curr_level == 0: 
+            levels.append(dict_of_set_dicts[category])
+            #Don't intersect any other sets since this is the top level
+            continue
+        else:
+            #In a lower level.  We need to find sets intersecting with
+            #each piece of the previous level
+            print "LEVELS:",levels
+            print "CURR LEVEL:",curr_level
+            print "CURR CATEGORY:",category
+            prev_level_data = levels[curr_level-1]
+            curr_level_data = dict_of_set_dicts[category]
+            new_entries = intersect_two_set_dicts(prev_level_data,curr_level_data)
+            levels.append(new_entries)
+    return levels
+            
+def intersect_two_set_dicts(d1,d2):
+    """Create a dict of intersections from two dicts of sets
+    
+    d1 -- a dict of sets  
+    d2 -- another dict of sets (typically will have common items)
+
+    NOTE: Which dict is assigned to d1 vs. d2 will affect the outcome- 
+    the resulting dict will have keys that
+    are tuples, with d1 keys first and d2 keys second.
+    """
+    result = {}
+    for k1,v1 in d1.iteritems():
+        for k2,v2 in d2.iteritems():
+            new_key = (k1,k2)
+            new_values = v1.intersection(v2)
+            result[new_key]=new_values
+    return result
+     
+
+
 
 def get_top_level_sets_from_mapping(mapping_table,categories):
     """Construct top level sets from a mapping file
