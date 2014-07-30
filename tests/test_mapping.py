@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Tests public and private functions in the plots module."""
+"""Tests the MappingTable object."""
 
 from cogent.util.unit_test import TestCase, main
 from mapping import MappingTable,average_points_by_x
