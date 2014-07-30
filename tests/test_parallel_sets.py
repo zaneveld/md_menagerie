@@ -16,7 +16,7 @@ __status__ = "Development"
 from cogent.util.unit_test import TestCase, main
 from md_menagerie.mapping import MappingTable
 from md_menagerie.parallel_sets import get_top_level_sets_from_mapping,\
-  intersect_two_set_dicts
+  intersect_two_set_dicts, parallel_sets_from_dict_of_set_dicts
 
 
 class ParallelSetsTests(TestCase):
@@ -39,6 +39,31 @@ class ParallelSetsTests(TestCase):
 
         self.ParallelSetsTable =\
           MappingTable(self.ParallelSetsTableLines)
+   
+        self.DictOfSetDicts =\
+          {"Temp":{"high":set(['S.8','S.7','S.2','S.3']),
+                   "low":set(['S.1','S.4','S.5','S.5b','S.6'])},
+           "Algae":{"algae":set(['S.1','S.2','S.5','S.8']),
+                    "no_algae":set(['S.3','S.4','S.5b','S.6','S.7'])}
+          }
+
+        
+    
+    def test_parallel_sets_from_dict_of_set_dicts_OK_valid_input(self):
+        """parallel_sets_from_set_dict function with valid input data"""
+        temp_algae = self.DictOfSetDicts
+        categories = ["Algae","Temp"]
+        exp_top_level = temp_algae["Algae"]
+        exp_bottom_level =\
+        {
+          ("algae","high"):set(["S.8","S.2"]),
+          ("algae","low"):set(["S.1","S.5"]),
+          ("no_algae","high"):set(["S.3","S.7"]),
+          ("no_algae","low"):set(["S.4","S.6","S.5b"])
+        }
+        exp = [exp_top_level,exp_bottom_level]
+        obs = parallel_sets_from_dict_of_set_dicts(temp_algae,categories)
+        self.assertEqualItems(obs,exp)
 
     def test_get_top_level_sets_from_mapping_OK_valid_input(self):
         """get_top_level_sets_from_mapping OK with valid input"""
