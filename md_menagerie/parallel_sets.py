@@ -68,9 +68,6 @@ def parallel_sets_from_dict_of_set_dicts(dict_of_set_dicts,categories):
         else:
             #In a lower level.  We need to find sets intersecting with
             #each piece of the previous level
-            print "LEVELS:",levels
-            print "CURR LEVEL:",curr_level
-            print "CURR CATEGORY:",category
             prev_level_data = levels[curr_level-1]
             curr_level_data = dict_of_set_dicts[category]
             new_entries = intersect_two_set_dicts(prev_level_data,curr_level_data)
