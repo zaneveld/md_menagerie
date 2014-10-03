@@ -23,11 +23,12 @@ except ImportError:
     raise ImportError("Could not import option parsing from cogent.util.option_parsing.  Is PyCogent installed (you can run this script within MacQIIME or the QIIME virtualbox to make use of a 'pre-packaged' PyCogent installation)")
 from string import strip
 from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import cm
-from matplotlib.ticker import LinearLocator, FormatStrFormatter
+from matplotlib import cm,rc
+from matplotlib.ticker import LinearLocator,LogLocator, FormatStrFormatter
 from matplotlib.mlab import griddata
+from matplotlib.colors import LogNorm
 import matplotlib.pyplot as plt
-from numpy import arange,sqrt,sin,array,meshgrid,interp,linspace
+from numpy import arange,sqrt,sin,array,meshgrid,interp,linspace,logspace,log10
 from numpy.random import uniform, seed
 from collections import defaultdict
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -67,7 +68,9 @@ script_info['optional_options'] = [\
   make_option('-s','--split_subplots_by_col',default=False,\
   help='If a column name is supplied, make one subplot per unique value in a given column.[default:%default]'),\
   make_option('--interpolate_y',default=False,action='store_true',\
-  help='Interpolate non-numerical y values using x values prior to plotting.[default:%default]')
+  help='If True, interpolate y linearly on x before plotting.[default:%default]'),\
+  make_option('--log_transform_z',default=False,action='store_true',\
+  help='If True, set the Z-axis scale based on log10 instead of linear values.[default:%default]')
 ]
 
 script_info['version'] = __version__
@@ -98,7 +101,7 @@ def parse_user_header_list(header_names, delimiter=",",expected_n_headers=3):
     #Read header
     user_specified_headers = header_names.split(delimiter)
     if len(user_specified_headers) != expected_n_headers:
-        partial_example_headers = ['header']* expected_n_header
+        partial_example_headers = ['header']* expected_n_headers
         full_example_headers = delimiter.join([h+str(i) for h,i in enumerate(partial_example_headers)])
         raise ValueError("Must specify %i  headers separated by '%s' to plot.  Example: '%s'" %(expected_n_headers,delimiter,full_example_headersi))
     return user_specified_headers
@@ -455,21 +458,27 @@ def output_3d_surface_plot(outfile,x,y,z,x_header,y_header,z_header,title=None,\
 
 
 def output_contour_plot(outfile,x,y,z,x_header,y_header,z_header,title=None,\
-  x_min=None,x_max=None,y_min=None,y_max=None,z_min=None,z_max=None):
+  x_min=None,x_max=None,y_min=None,y_max=None,z_min=None,z_max=None,log_z=False,n_level=10):
     """Make a combined scatter and contour plot, interpolating irregularly spaced data"""
     
     n_points=len(zip(x,y))
     xi,yi,zi = interpolate_irregular_data(x,y,z)
     #fig = make_contour_plot(x,y,z,xi,yi,zi,x_header,y_header,z_header,title)
     fig = make_contour_plot(x,y,z,xi,yi,zi,x_header,y_header,z_header,title=title,fig=fig,ax=ax,\
-                  x_min=x_min,x_max=x_max,y_min=y_min,y_max=y_max,z_min=z_min,z_max=z_max)
+                  x_min=x_min,x_max=x_max,y_min=y_min,y_max=y_max,z_min=z_min,z_max=z_max,log_z=log_z,\
+                  n_levels=10)
     plt.savefig(outfile)
    
 
 def make_contour_plot(x,y,z,xi,yi,zi,x_header,y_header,z_header,title=None,fig=None,ax=None,\
-  x_min=None,x_max=None,y_min=None,y_max=None,z_min=None,z_max=None):
-    """Make a contour plot with color coding for the z-axis"""
+  x_min=None,x_max=None,y_min=None,y_max=None,z_min=None,z_max=None,log_z = False,n_levels=10):
+    """Make a contour plot with color coding for the z-axis
     
+    log_z -- if True, use a log base 10 scale for colors
+    """
+    font = {'family' : 'sans-serif', 'weight' : 'bold','size'   : 22}
+
+    #rc(font, **font)
     #Set maximum and minimum values
     #TODO: ugly and repetitive.  Revise as a dict?
     if x_min is None:
@@ -490,14 +499,26 @@ def make_contour_plot(x,y,z,xi,yi,zi,x_header,y_header,z_header,title=None,fig=N
         fig = plt.figure()
     if not ax:
         ax = plt.subplot(1,1,1)
-
-    n_levels = 10
-    contour_levels = linspace(z_min, z_max, n_levels)
-    CS = ax.contour(xi,yi,zi,contour_levels,linewidths=0.5,colors='k')
-    #CS = ax.contourf(xi,yi,zi,15,cmap=plt.cm.afmhot,\
-    #  vmax=abs(zi).max(), vmin=-abs(zi).max())
+    if log_z is False:
+        epsilon = 0.0
+        contour_z_min = z_min
+        contour_z_max = z_max
+        contour_levels = linspace(z_min, z_max, n_levels)
+    else:
+        epsilon=1e-5
+        zi += epsilon
+        z = list(array(z) + epsilon)
+        contour_z_min = log10(z_min+epsilon)-1
+        contour_z_max = log10(z_max)
+        #contour_levels = logspace(contour_z_min, contour_z_max, n_levels)
+        #fuck it hardcoding the levels 
+        contour_levels=[epsilon,1e-4,1e-3,0.01,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+    CS = ax.contour(xi,yi,zi,levels=contour_levels,linewidths=0.5,colors='k')
+    CS = ax.contourf(xi,yi,zi,levels=contour_levels,cmap=plt.cm.Spectral_r)
     
-    CS = ax.contourf(xi,yi,zi,contour_levels,cmap=plt.cm.afmhot)
+    # Old working version with logs
+    #CS = ax.contour(xi,yi,zi,levels=contour_levels,locator=LogLocator(),linewidths=0.5,colors='k',norm=LogNorm())
+    #CS = ax.contourf(xi,yi,zi,levels=contour_levels,locator=LogLocator(),cmap=plt.cm.ocean_r,norm=LogNorm())
     
 
     divider = make_axes_locatable(ax)
@@ -505,7 +526,7 @@ def make_contour_plot(x,y,z,xi,yi,zi,x_header,y_header,z_header,title=None,fig=N
     #cbar_ticks = linspace(z_min,z_max,15.0,endpoint=True)
     #cbar = plt.colorbar(CS, cax=cax,ticks=cbar_ticks)
     cbar = plt.colorbar(CS,cax=cax,format='%1.2g')
-    cbar.set_clim(vmin=z_min,vmax=z_max)
+    cbar.set_clim(vmin=z_min+epsilon,vmax=z_max)
     # plot data points.
     ax.scatter(x,y,marker='o',c='b',s=5,zorder=10)
     
@@ -523,9 +544,15 @@ def make_contour_plot(x,y,z,xi,yi,zi,x_header,y_header,z_header,title=None,fig=N
         ax.set_title(title)
     return fig 
     
-def output_multipart_figure(outfile,datasets,x_header,y_header,z_header,plot_types=['3d_surface'],title=None,fig=None,min_data_points=5,\
-        x_min=None,x_max=None,y_min=None,y_max=None,z_min=None,z_max=None,verbose=False):
-    """Output multipart figure with many subplots of mixed type"""
+def output_multipart_figure(outfile,datasets,x_header,y_header,z_header,\
+        plot_types=['3d_surface'],title=None,fig=None,min_data_points=5,\
+        x_min=None,x_max=None,y_min=None,y_max=None,z_min=None,\
+        z_max=None,verbose=False,log_z=False):
+    """Output multipart figure with many subplots of mixed type
+    
+    log z -- use log instead of linear levels when setting contour 
+      plot levels for the z axis
+    """
     
     
     total_subfigures = len(datasets) * len(plot_types)
@@ -540,7 +567,6 @@ def output_multipart_figure(outfile,datasets,x_header,y_header,z_header,plot_typ
         fig = plt.figure(1,figsize=figsize)
         fig.patch.set_facecolor('white')
     #Otherwise new subplots will be added to the current figure
-    
     
     curr_subplot = 1
     
@@ -568,7 +594,7 @@ def output_multipart_figure(outfile,datasets,x_header,y_header,z_header,plot_typ
                     print "Adding contour subplot:",i+1,j+1,1
                 ax = fig.add_subplot(n_rows,n_cols,curr_subplot)
                 make_contour_plot(x,y,z,xi,yi,zi,x_header,y_header,z_header,title=title_text,fig=fig,ax=ax,\
-                  x_min=x_min,x_max=x_max,y_min=y_min,y_max=y_max,z_min=z_min,z_max=z_max)
+                  x_min=x_min,x_max=x_max,y_min=y_min,y_max=y_max,z_min=z_min,z_max=z_max,log_z=log_z)
             
             elif plot_type == "3d_surface":
                 if verbose:
@@ -643,9 +669,10 @@ if __name__ == "__main__":
         z_min,z_max = map(float,opts.z_limits.split(",")) 
     else:
         z_min,z_max = (None,None)
-    
+   
+     
     output_multipart_figure(outfile,data_series,x_header,y_header,z_header,plot_types=plots_to_make,\
-      x_min=x_min,x_max=x_max,y_min=y_min,y_max=y_max,z_min=z_min,z_max=z_max,verbose=opts.verbose)
+      x_min=x_min,x_max=x_max,y_min=y_min,y_max=y_max,z_min=z_min,z_max=z_max,verbose=opts.verbose,log_z=opts.log_transform_z)
 
     #Save plot to outfile
     #plt.clf()
